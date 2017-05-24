@@ -14,8 +14,6 @@ URI: localhost:8081
 Primary Key: C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
 ```
 
-**NOTE** I was not able to get the emulator working with my Xamarin project. I would get a connection refused error at runtime when I tried getting items frmo the DB.
-
 ### Step 1
 We need to get to create our Azure Document DB instance in our Azure Portal. 
 

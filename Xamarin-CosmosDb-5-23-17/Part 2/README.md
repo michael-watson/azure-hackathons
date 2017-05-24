@@ -1,5 +1,5 @@
 # Part 2 - Create Azure REST API that connect with Cosmos DB
-Now that we have connected to the database directly with a Xamarin.Forms application in Part 1, let's discuss creating a REST API layer that can handle more serious stuff. This is a very common architecture for mobile applications and using Azure with Cosmos is a real option for us.
+Now that we have connected to the database directly with a Xamarin.Forms application in Part 1, let's discuss creating a REST API layer that can handle more serious stuff. This is a very common architecture for mobile applications and using Azure with Cosmos is a real option for developers.
 
 In this exercise, we will be creating a new Azure REST API that will connect with our Cosmos DB we created previously. So we will continue to use the **DatabaseId** as *Xamarin* and the **CollectionId** as *Dog*. 
 
@@ -271,7 +271,7 @@ You should now get a response with your name and hair color. We implemented a so
 **The completed solution to this point is located in the "Part 2/CosmosHackApi-GenericValuesEndpoint-Complete"**
 
 ### Step 4 - Creating a BaseApiController to allow specific `type` implementations
-This section will complete a basic architecture and framework that is a great solution for some of our customers. It also demonstrates some basics of Azure for them to get started with.
+This section will complete a basic architecture and framework that is a great solution for mobile. It also demonstrates some basics of Azure for anyone to get started with.
 
 4a) Let's create a `BaseApiController` class in our **Controllers** folder. I like to start from the emply class, but if you right click the **Controller** folder and selected **Add->Controller** and wonder what template to use. Go ahead and use the Empyt API controller.
 
