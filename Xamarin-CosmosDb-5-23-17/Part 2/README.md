@@ -23,18 +23,38 @@ Open up the `Web.config` file and add the following keys to the `appSettings`:
 
 Now we can use these values later in our code.
 
-1b) Now we can use the existing files in the new project, so let's open up the `ValuesController.cs` file located in the **Controllers** folder.
+1b) Let's add our `Dog` model to the project in the **Models** folder
 
-1c) Now modify the `Get` method to interact with our Cosmos DB just like we did in **Part 1**. Here is where we will also use those values we placed in our API Apps config file
+```csharp
+using Newtonsoft.Json;
+
+public class Dog
+{
+    [JsonProperty("id")]
+    public string Id {get;set;}
+    [JsonProperty("name")]
+    public string Name {get;set;}
+    [JsonProperty("furColor")]
+    public string FurColor {get;set;}
+}
+```
+
+1c) Next we need to install the **Microsoft.Azure.DocumentDb** package.
+
+1c) Now we can use the existing files in the new project, so let's open up the `ValuesController.cs` file located in the **Controllers** folder.
+
+1d) Now modify the `Get` method to interact with our Cosmos DB just like we did in **Part 1**. Here is where we will also use those values we placed in our API Apps config file
 
 ```csharp   
-    static readonly DocumentClient documentClient = new DocumentClient(new Uri(ConfigurationManager.AppSettings["endpoint"]), ConfigurationManager.AppSettings["authKey"], new ConnectionPolicy { EnableEndpointDiscovery = false });
-    static readonly string DatabaseId = "Xamarin";//This is our Database ID we created in the Azure Portal
-    static readonly string CollectionId = "Dog";//This is the name of our model we created in the Azure Portal
-
     public static async Task<Dog> Get(string id)
     {
-        var result = await documentClient.ReadDocumentAsync<Dog>(UriFactory.CreateDocumentUri(DatabaseId, CollectionId, id));
+        var  documentClient = new DocumentClient(
+            new Uri(ConfigurationManager.AppSettings["endpoint"]), 
+            ConfigurationManager.AppSettings["authKey"], 
+            new ConnectionPolicy { EnableEndpointDiscovery = false }
+        );
+        var docLink = UriFactory.CreateDocumentUri("Xamarin", "Dog", id);
+        var result = await documentClient.ReadDocumentAsync<Dog>(docLink);
 
         if (result.StatusCode != System.Net.HttpStatusCode.Created)
             return null;
@@ -74,32 +94,18 @@ We want to get this object from our database, but if you gave your object anothe
 ## Step 2 - Create a layer that handles it all
 First to create this layer, we need to create some static methods that perform our basic CRUD operations. If you have looked at the getting started sample from Microsoft, they create a static `DocumentDbRespository` class. We will be pulling from that code.
 
-We are going to have all of our CRUD operations be based off of the `Id` poperty for our objects and the `CollectionId` for what table to access. We will just want a `DatabaseId` to be **Xamarin**.
+2a) We are going to have all of our CRUD operations be based off of the `Id` poperty for our objects and the `CollectionId` for what table to access. We will just want a `DatabaseId` to be **Xamarin**.
 
 ```csharp
 public static class DocumentDbRepository
 {
     private static readonly string DatabaseId = "Xamarin";
-    private static DocumentClient client;
+    private static DocumentClient client new DocumentClient(new Uri(ConfigurationManager.AppSettings["endpoint"]), ConfigurationManager.AppSettings["authKey"], new ConnectionPolicy { EnableEndpointDiscovery = false });
 
     public static async Task<T> GetItemAsync<T>(string collectionId, string id)
     {
-        try
-        {
-            Document document = await client.ReadDocumentAsync(UriFactory.CreateDocumentUri(DatabaseId, collectionId, id));
-            return (T)(dynamic)document;
-        }
-        catch (DocumentClientException e)
-        {
-            if (e.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-                return default(T);
-            }
-            else
-            {
-                throw;
-            }
-        }
+        Document document = await client.ReadDocumentAsync(UriFactory.CreateDocumentUri(DatabaseId, collectionId, id));
+        return (T)(dynamic)document;
     }
 
     public static async Task<Document> CreateItemAsync<T>(string collectionId, T item)
@@ -115,11 +121,6 @@ public static class DocumentDbRepository
     public static async Task DeleteItemAsync(string collectionId, string id)
     {
         await client.DeleteDocumentAsync(UriFactory.CreateDocumentUri(DatabaseId, collectionId, id));
-    }
-
-    public static void Initialize()
-    {
-        client = new DocumentClient(new Uri(ConfigurationManager.AppSettings["endpoint"]), ConfigurationManager.AppSettings["authKey"], new ConnectionPolicy { EnableEndpointDiscovery = false });
     }
 }
 ```
@@ -147,6 +148,8 @@ This allows us to provide the type to our method calls and expect the same retur
 
 But they can run in our Azure cloud stuff. There is a great Pluralsight course on Dynamic C# if you can figure out access. But the basic gist of it is the `dynamic` keyword will cause the compiler to ignore any compile errors from that object. You are telling the compiler *trust me computer, I know when everything runs it will work*. This means you won't see errors when you build or deploy your project, the errors will happen at runtime. 
 
+**The completed solution to this point is located in the "Part 2/CosmosHackApi-SimpleGet-Complete"**
+
 ### Step 3 - JObject was made for Json
 Remember how we setup our first `Collection` in our Cosmos DB? It was just a Json blob. `Json.Net` library his pretty much a standard for Json in C#/.Net projects. Inside the library there is a class called `JObject`. This object is basically a nice implementation that can take a string of Json and organize everything so you can easily access the json properties. But the best part is we can use this for our Cosmos DB in our Layer that makes things work!
 
@@ -156,37 +159,89 @@ Remember how we setup our first `Collection` in our Cosmos DB? It was just a Jso
 public class ValuesController : ApiController
 {
     // GET api/values?collectionId={ClassType}&id={DocumentID}
-    public async Task<JObject> Get(string collectionId, string id)
-    {
-        var items = await DocumentDbRepository.GetItemAsync<JObject>(collectionId, id);
+        public async Task<JObject> Get(string collectionId, string id)
+        {
+            try
+            {
+                var items = await DocumentDbRepository.GetItemAsync<JObject>(collectionId, id);
 
-       return items;
-    }
+            return items;
+            }
+            catch (DocumentClientException e)
+            {
+                Console.WriteLine("Unable to find item in DB");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Unknown Error {e.Message}");
+            }    
 
-   // POST api/values?collectionId={ClassType}
-    public async Task<Document> Post(string collectionId, [FromBody]JObject item)
-    {
-        var update = await DocumentDbRepository.CreateItemAsync<JObject>(collectionId, item);
+            return null;
+       }
 
-       return update;
-    }
+       // POST api/values?collectionId={ClassType}
+        public async Task<Document> Post(string collectionId, [FromBody]JObject item)
+        {
+            try
+            {
+                var created = await DocumentDbRepository.CreateItemAsync<JObject>(collectionId, item);
 
-   // PUT api/values/5
-    public async Task<Document> Put(string collectionId, string id, [FromBody]JObject item)
-    {
-        var update = await DocumentDbRepository.UpdateItemAsync<JObject>(collectionId, id, item);
+               return created;
+            }
+            catch (DocumentClientException e)
+            {
+                Console.WriteLine("Unable to create item, it already existed");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Unknown Error {e.Message}");
+            }
 
-       return update;
-    }
+           return null;
+        }
 
-   // DELETE api/values/5
-    public async Task Delete(string collectionId, string id)
-    {
-        await DocumentDbRepository.DeleteItemAsync(collectionId, id);
-    }
+       // PUT api/values/5
+        public async Task<Document> Put(string collectionId, [FromBody]JObject item)
+        {
+            try
+            {
+                var itemId = item["id"].ToString();
+
+               var update = await DocumentDbRepository.UpdateItemAsync<JObject>(collectionId, itemId, item);
+
+               return update;
+            }
+            catch (NullReferenceException e)
+            {
+                Console.WriteLine("Id property not found in JSON Payload");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Unknown Error {e.Message}");
+            }
+
+           return null;
+        }
+
+       // DELETE api/values/5
+        public async Task Delete(string collectionId, string id)
+        {
+            try
+            {
+                await DocumentDbRepository.DeleteItemAsync(collectionId, id);
+            }
+            catch (DocumentClientException E)
+            {
+                Console.WriteLine("Unable to delete file, it wasn't found in DB");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Unknown Error {e.Message}");
+            }
+        }
 }
 ```
-Notice we are using `JObject` for the parameters taken in from the `HTTP` request body. 
+Notice we are using `JObject` for the parameters taken in from the `HTTP` request body. We also have included the minimum for error handling in your API. Remember that one unhandled exception will bring your API down, so going forward we will be adding error handling to our template.
 
 3b) Now build and publish the application again.
 
@@ -211,7 +266,9 @@ You should have got a response that looked the same as before where we see Olive
 ```
 api/Values?collectionId=People&id=1
 ```
-You should now get a response with your name and hair color. We implemented a solution with one set of API endpoints that will work for any data type. Test it out some more if you want. If you continue to Step 4, we will create a `BaseApiController` that will let us implement this for a specific data type where we will get the basic CRUD operations easily and have the ability to do data sorting operations or whatever we want.
+You should now get a response with your name and hair color. We implemented a solution with one set of API endpoints that will work for any data type. Test it out some more if you want. As long as the **CollectionId** exists in the Cosmos DB, you will get the correcct response. Super cool and powerful, but what about doing advanced queries? We can create one more abstraction that will make this easy to architect. If you continue to Step 4, we will create a `BaseApiController` that will let us implement this for a specific data type where we will get the basic CRUD operations easily and have the ability to do data sorting operations or whatever we want.
+
+**The completed solution to this point is located in the "Part 2/CosmosHackApi-GenericValuesEndpoint-Complete"**
 
 ### Step 4 - Creating a BaseApiController to allow specific `type` implementations
 This section will complete a basic architecture and framework that is a great solution for some of our customers. It also demonstrates some basics of Azure for them to get started with.
@@ -227,33 +284,85 @@ public class BaseApiController<T> : ApiController
 
     public async Task<T> Get(string id)
     {
-        var items = await DocumentDbRepository.GetItemAsync<T>(collectionId, id);
+        try
+        {
+            var items = await DocumentDbRepository.GetItemAsync<T>(collectionId, id);
 
-       return (T)(dynamic)items;
+            return (T)(dynamic)items;
+        }
+        catch (DocumentClientException e)
+        {
+            Console.WriteLine("Unable to find item in DB");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Unknown Error {e.Message}");
+        }
+
+        return default(T);
     }
 
     public async Task<Document> Post([FromBody]T item)
     {
-        var update = await DocumentDbRepository.CreateItemAsync<T>(collectionId, item);
+        try
+        {
+            var create = await DocumentDbRepository.CreateItemAsync<T>(collectionId, item);
 
-       return update;
+            return create;
+        }
+        catch (DocumentClientException e)
+        {
+            Console.WriteLine("Unable to create item, it already existed");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Unknown Error {e.Message}");
+        }
+
+        return null;
     }
 
-    public async Task<Document> Put(string id, [FromBody]T item)
+    public async Task<Document> Put([FromBody]T item)
     {
-        var update = await DocumentDbRepository.UpdateItemAsync<T>(collectionId, id, item);
+        try
+        {
+            var itemId = ((dynamic)item).Id.ToString();
 
-       return update;
+            var update = await DocumentDbRepository.UpdateItemAsync<T>(collectionId, itemId, item);
+
+            return update;
+        }
+        catch (NullReferenceException e)
+        {
+            Console.WriteLine("Id property not found in JSON Payload");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Unknown Error {e.Message}");
+        }
+
+        return null;
     }
 
     public async Task Delete(string id)
     {
-        await DocumentDbRepository.DeleteItemAsync(collectionId, id);
+        try
+        {
+            await DocumentDbRepository.DeleteItemAsync(collectionId, id);
+        }
+        catch (DocumentClientException e)
+        {
+            Console.WriteLine("Unable to delete file, it wasn't found in DB");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Unknown Error {e.Message}");
+        }
     }
 }
 ```
 
-4c) Let's actually see this cool controller in action. Let's create a `Dog` model class in our **DataObjects** folder.
+If you skipped past the simple GET seciont, then add your `Dog` model class in our **DataObjects** folder.
 ```csharp
 using Newtonsoft.Json;
 
@@ -283,4 +392,4 @@ PUT api/XamarinDogs Body with ID and parts of object to update
 Delete api/XamarinDogs?id={ID to delete}
 ```
 
-4e) Go ahead and publish the application one more time and test it out with Postman. You should be able to hit those endpoint and manipulate your data. 
+4e) Go ahead and publish the application one more time and test it out with Postman. You should be able to hit those endpoint and manipulate your data. Also notice how this architecture is stripping out the additional Cosmos DB properties and only returning the object we have defined in out **Models** folder. 
