@@ -8,6 +8,14 @@ Get ready to start digging directly into Cosmos, it's going to be fun!
 
 We will want to enable local development of Cosmos DB and there is an emulator that you can use. How we work with Cosmos in the emulator or the Azure portal will be very similar. Go [here](https://docs.microsoft.com/en-us/azure/documentdb/documentdb-nosql-local-emulator) to install the Cosmos emulator. Don't worry about playing around here for now, this just gives you the option to debug everything locally in the future. 
 
+When you connect to the emulator you will use the following for the URL and the emulator [master Primary Key](https://docs.microsoft.com/en-us/azure/documentdb/documentdb-nosql-local-emulator):
+```
+URI: localhost:8081
+Primary Key: C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
+```
+
+**NOTE** I was not able to get the emulator working with my Xamarin project. I would get a connection refused error at runtime when I tried getting items frmo the DB.
+
 ### Step 1
 We need to get to create our Azure Document DB instance in our Azure Portal. 
 
@@ -54,7 +62,7 @@ Once you save the document, the ID property should get populated. If you want to
 ### Step 3 - Xamarin.Forms Project
 Now we have everything setup in Cosmos for us to grab data. 
 
-3a) Create a new Xamarin.Forms project. 
+3a) Create a new Xamarin.Forms project with a shared library. Now add the **Json.Net** and **Microsoft.Azure.DocumentDb.Core** NuGet package to all the projects (Don't install the Core package). Cosmos Document DB Nuget Package doesn't have this class available in the PCL implementation so you would have to do some pattern to get access to the control in the platform specific projects.
 
 3b) Next create a new Model in our shared project for our **Dog** object.
 
@@ -63,11 +71,11 @@ using Newtonsoft.Json;
 
 public class Dog
 {
-    [JsonAttribute("id")]
+    [JsonProperty("id")]
     public string Id {get;set;}
-    [JsonAttribute("name")]
+    [JsonProperty("name")]
     public string Name {get;set;}
-    [JsonAttribute("furColor")]
+    [JsonProperty("furColor")]
     public string FurColor {get;set;}
 }
 ```
@@ -102,6 +110,8 @@ public class ViewOlivePage : ContentPage
 
 Make sure to grab the URI and Primary Key you wrote copied earlier. If you don't have them, go back to the **Keys** section of the Cosmos DB in your Azure Portal to get them.
 
+If you are using a PCL implementation, you will have to use DependencyService since the `DocumentClient` object below is not available in the standard PCL subset.
+
 ```csharp
 public static class DocumentDbService
 {
@@ -113,7 +123,7 @@ public static class DocumentDbService
     {
         var result = await documentClient.ReadDocumentAsync<Dog>(UriFactory.CreateDocumentUri(DatabaseId, CollectionId, id));
 
-        if (result.StatusCode != System.Net.HttpStatusCode.Created)
+        if (result.StatusCode != System.Net.HttpStatusCode.OK)
             return null;
 
         return result;
@@ -135,6 +145,7 @@ public class ViewOlivePage : ContentPage
         Content = new StackLayout
         {
             Padding = 20,
+            VerticalOptions = LayoutOptions.Center,
             Children = {
                 nameLabel,
                 furColorLabel,
@@ -146,11 +157,12 @@ public class ViewOlivePage : ContentPage
         {
             var dog = await DocumentDbService.GetDogByIdAsync("1");
 
-            Device.BeginInvokeOnMainThread(()=>
-            {
-                nameLabel.Text = dog.Name;
-                furColorLabel.Text = dog.FurColor;
-            })
+            if(dog!=null)
+                Device.BeginInvokeOnMainThread(()=>
+                {
+                    nameLabel.Text = dog.Name;
+                    furColorLabel.Text = dog.FurColor;
+                });
         };
     }
 }
