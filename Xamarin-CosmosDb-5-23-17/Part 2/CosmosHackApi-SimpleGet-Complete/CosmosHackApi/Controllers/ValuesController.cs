@@ -5,6 +5,10 @@ using System.Net;
 using System.Net.Http;
 using System.Web.Http;
 using Swashbuckle.Swagger.Annotations;
+using System.Threading.Tasks;
+using CosmosHackApi.Models;
+using Microsoft.Azure.Documents.Client;
+using System.Configuration;
 
 namespace CosmosHackApi.Controllers
 {
@@ -21,9 +25,21 @@ namespace CosmosHackApi.Controllers
         [SwaggerOperation("GetById")]
         [SwaggerResponse(HttpStatusCode.OK)]
         [SwaggerResponse(HttpStatusCode.NotFound)]
-        public string Get(int id)
+        public async Task<Dog> Get(string id)
         {
-            return "value";
+            var documentClient = new DocumentClient(
+                new Uri(ConfigurationManager.AppSettings["endpoint"]),
+                ConfigurationManager.AppSettings["authKey"],
+                new ConnectionPolicy { EnableEndpointDiscovery = false }
+            );
+            var docLink = UriFactory.CreateDocumentUri("Xamarin", "Dog", id);
+
+            var result = await documentClient.ReadDocumentAsync<Dog>(docLink);
+
+            if (result.StatusCode != HttpStatusCode.OK)
+                return null;
+
+            return result;
         }
 
         // POST api/values
