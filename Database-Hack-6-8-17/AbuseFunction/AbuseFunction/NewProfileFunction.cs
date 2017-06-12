@@ -15,7 +15,7 @@ namespace AbuseFunction
         [FunctionName("NewProfile")]
         public static async Task<HttpResponseMessage> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)]HttpRequestMessage req, TraceWriter log)
         {
-            var str = "Server=tcp:databasehacksql.database.windows.net,1433;Initial Catalog=DatabaseHackSql;Persist Security Info=False;User ID=miwats;Password=Xamarin123;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
+            var str = ConfigurationManager.ConnectionStrings["sql_connection"].ConnectionString;
             using (SqlConnection connection = new SqlConnection(str))
             {
                 await connection.OpenAsync();
