@@ -34,7 +34,8 @@ namespace AbuseFunction
             //return req.CreateResponse<UserProfile>(result);
 
             //We will use the ConnectionStrings for all Azure SQL and Azure PostgreSql
-            var str = ConfigurationManager.ConnectionStrings["{Your connection string from portal}"].ConnectionString;
+            //var str = ConfigurationManager.ConnectionStrings["sql_connection"].ConnectionString;
+            var str="Server=tcp:databasehacksql.database.windows.net,1433;Initial Catalog=DatabaseHackSql;Persist Security Info=False;User ID=miwats;Password=Xamarin123;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
             using (SqlConnection centroConnection = new SqlConnection(str))
             {
                 await centroConnection.OpenAsync();
@@ -42,9 +43,8 @@ namespace AbuseFunction
 
                 try
                 {
-                    UserProfile profile = dbContext.UserProfiles.Where(p => p.Email == "{Entered Email}").FirstOrDefault();
+                    UserProfile profile = dbContext.UserProfiles.Where(p => p.Email == "michaelwatson93@gmail.com").FirstOrDefault();
                     return req.CreateResponse<UserProfile>(profile);
-
                 }
                 catch (Exception e)
                 {
